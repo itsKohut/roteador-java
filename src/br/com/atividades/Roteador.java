@@ -2,8 +2,10 @@ package br.com.atividades;
 
 import br.com.atividades.dto.Mensagem;
 import br.com.atividades.dto.Roteamento;
-import br.com.atividades.listener.ListenerTarefa;
 import br.com.atividades.printer.Impressora;
+import br.com.atividades.tarefas.atualizar.AtualizarTarefa;
+import br.com.atividades.tarefas.keepalive.KeepAliveTarefa;
+import br.com.atividades.tarefas.listener.ListenerTarefa;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -16,15 +18,23 @@ import java.net.SocketException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static br.com.atividades.image.Image.encodedImageToBase64;
+
 public class Roteador {
 
     public static String LOCALHOST = "localhost";
     public static InetAddress inetAddress;
     public static Integer quantidadePortaLocal; // quantidade de portas locais (1 ou 2)
+
+    //controle
     public static List<Roteamento> tabelaRoteamento = Collections.synchronizedList(new ArrayList());
     public static Map<Integer, Integer> vizinhos = new HashMap<>(); // porta local (chave) e porta vizinho (valor)
-    public static Map<Integer, ListenerTarefa> listenerTasks = new HashMap<>(); // porta (chave) e thread de listening (valor)
+
+    //tarefas
+    public static Map<Integer, AtualizarTarefa> atualizarTarefas = new HashMap<>(); // porta (chave) e atualizar tarefa da porta (valor)
     public static Map<Integer, DatagramSocket> datagramSocketSenders = new HashMap<>(); // porta (chave) e socket da porta (valor)
+    public static Map<Integer, KeepAliveTarefa> keepAliveTarefas = new HashMap<>(); // porta (chave) e keepalive da porta (valor)
+    public static Map<Integer, ListenerTarefa> listenerTasks = new HashMap<>(); // porta (chave) e thread de listening (valor)
 
     public static void main(String[] args) throws IOException {
         System.out.println(">>> Router iniciado <<<");
@@ -49,11 +59,12 @@ public class Roteador {
     public static void comando(Scanner input) throws IOException {
 
         /**
-         * 1 - Enviar mensagem ");
-         * 2 - Imprimir as portas e seu respectivo vizinho");
-         * 3 - Imprimir tabela de roteamento");
-         * 4 - Remover uma porta do roteador ");
-         * 5 - Desligar roteador");
+         * 1 - Enviar mensagem ";
+         * 2 - Imprimir as portas e seu respectivo vizinho";
+         * 3 - Imprimir tabela de roteamento";
+         * 4 - Remover uma porta do roteador ";
+         * 5 - Desligar roteador";
+         * 6 - Starter das tarefas de atualização de roteamento e keepalive";
          * */
 
         Impressora.menu();
@@ -78,7 +89,7 @@ public class Roteador {
                 desligarRoteador();
                 break;
             case 6:
-                //TODO chamada do metodo que cria a thread de atualização do roteamento (ver de exxemplo as classes no package listener)
+                iniciarDemaisTarefas();
                 break;
             default:
                 System.out.println("Comando inválido");
@@ -164,7 +175,7 @@ public class Roteador {
 
         System.out.println("************************************************");
 
-        System.out.format("# Digite a mensagem a ser enviada:\n");
+        System.out.format("# Digite a mensagem a ser enviada: (para envio de mensagem adicionar a mensagem a tag '#image')\n");
         input.nextLine(); // consome o \n
         String texto = input.nextLine();
 
@@ -177,6 +188,12 @@ public class Roteador {
         System.out.println("************************************************");
 
         Mensagem mensagem = new Mensagem(portaOrigem, portaDestino, texto);
+
+        // caso a mensagem contenha a palatra lotr.jpg vai adicionar o base64 na mensagem
+        if(texto.contains("#image")) {
+            texto.replaceAll("#imagem", "");
+            mensagem.setBase64Image(encodedImageToBase64());
+        }
 
         // Serialize to a byte array
         ByteArrayOutputStream bStream = new ByteArrayOutputStream();
@@ -226,6 +243,36 @@ public class Roteador {
         Impressora.imprime(tabelaRoteamento);
         System.out.format("Porta %s deletada do roteador\n", porta);
     }
+
+
+    private static void iniciarDemaisTarefas()  {
+
+        // isso aqui leva em consideração que não iremos ter mudança em runtime das portas, pq dai a logica mudaria
+        if (atualizarTarefas.isEmpty() && keepAliveTarefas.isEmpty()) {
+            vizinhos.forEach((porta, vizinho) -> {
+
+                DatagramSocket datagramSocket = datagramSocketSenders.get(porta);
+
+                try {
+                    datagramSocket.setSoTimeout(30); // vai estourar erro no socket.recieve desse socket (tem que fazer um tratamento lá para desconecatr a porta vizinha quando acontecer isso)
+                } catch (SocketException e) {
+//                e.printStackTrace();
+                }
+
+                //TODO checar tempo em segundos das tarefas com o que pede no rtabalho
+                atualizarTarefas.put(porta, new AtualizarTarefa(15, datagramSocket)); // cria tarefa atualização desta porta
+
+                // se o socket.receive desta porta nao receber alguma mensagem no tempo determinado abaixo, sera estourado uma execeção
+                //no receive  do socket que deve ser tratado devidamente.
+                keepAliveTarefas.put(porta, new KeepAliveTarefa(vizinho, 10, datagramSocket));
+            });
+        } else {
+            System.out.println("Ja foram iniciados as demais tarefas, não é possivel execut-la novamente");
+        }
+
+    }
+
+
 
     //TODO testar este metodo quando tiver mais threads alterando essa lista ao mesmo tempo
     private synchronized static void removeReferenciasDaTabelaDeRoteamento(int porta) {

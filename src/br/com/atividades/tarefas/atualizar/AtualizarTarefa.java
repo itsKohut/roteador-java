@@ -1,4 +1,4 @@
-package br.com.atividades.atualizar;
+package br.com.atividades.tarefas.atualizar;
 
 import java.net.DatagramSocket;
 import java.util.Timer;

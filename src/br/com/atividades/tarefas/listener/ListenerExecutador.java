@@ -1,8 +1,9 @@
-package br.com.atividades.listener;
+package br.com.atividades.tarefas.listener;
 
 import br.com.atividades.dto.Mensagem;
 import br.com.atividades.Roteador;
 import br.com.atividades.dto.Roteamento;
+import br.com.atividades.image.Image;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -32,7 +33,7 @@ class ListenerExecutador extends TimerTask {
 
     public void run() {
 
-        DatagramPacket packet = new DatagramPacket(new byte[1024 * 1], 0, new byte[1024 * 1].length);
+        DatagramPacket packet = new DatagramPacket(new byte[1024 * 12], 0, new byte[1024 * 12].length);
 
         try {
 
@@ -49,27 +50,39 @@ class ListenerExecutador extends TimerTask {
             if (Mensagem.class.isInstance(object)) { // mensagem comum
                 mensagem = (Mensagem) object;
 
-                System.out.format("A mensagem '%s' foi enviada da porta %d %s\n",
+                System.out.format("A mensagem '%s' foi enviada da porta %d %s %s\n",
                         mensagem.getTexto(),
                         mensagem.getPortaOrigem(),
-                        transformarPorta(mensagem.getPortaDestino()));
+                        transformarPorta(mensagem.getPortaDestino()),
+                        mensagem.getBase64Image() == null ? "" : "(mensagem com imagem anexada");
             }
 
             /** Esse tipo de objeto sera apenas enviado através de uma thread agendadora ou evento de exit de um roteador*/
             if (object instanceof java.util.List) { // mensagem de atualização de tabela de roteamento
                 if (((List) object).size() > 0 && (((List) object).get(0) instanceof Roteamento)) {
-                    List<Roteamento> tabelaRoteamentoRecebida = (List<Roteamento>) object;
+                    tabela = (List<Roteamento>) object;
 
+                    System.out.println(tabela);
                     // TODO lógica de atualização da tabela de roteamento
                 }
             }
 
             iStream.close();
 
+            if(mensagem != null && mensagem.getTexto().contains("#KEEP-ALIVE")) {
+                System.out.println("Mensagem do keep-alive recebida com sucesso"); // comentar este print quando testado
+                return; // sai do metodo para nao continuar a execulçao de demais logica abaixo
+            }
+
             /** verifica se é ou não o roteador final*/
             boolean roteadorFinal = verificarRoteadorFinal(mensagem.getPortaDestino(), getDatagramSocket().getLocalPort());
 
             if (roteadorFinal) {
+
+                if (mensagem != null && mensagem.getBase64Image() != null) {
+                    System.out.format("Imagem salva no diretório %s)\n", Image.RESOURCE_PATH);
+                    Image.decodeImageToBase64(mensagem);
+                }
                 System.out.println("Mensagem enviada para o roteador destino com sucesso!");
 
             /** caso não for repassa a mensagem para o proximo roteador */
