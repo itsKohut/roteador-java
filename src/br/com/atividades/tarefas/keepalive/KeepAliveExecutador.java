@@ -11,37 +11,44 @@ import java.net.DatagramSocket;
 import java.util.TimerTask;
 
 import static br.com.atividades.Roteador.inetAddress;
+import static br.com.atividades.Roteador.vizinhos;
 
 class KeepAliveExecutador extends TimerTask {
 
     private DatagramSocket datagramSocket;
-    private Integer portaVizinho;
     private Mensagem mensagem;
 
-    public KeepAliveExecutador(Integer portaVizinho, DatagramSocket socket) {
-        this.portaVizinho = portaVizinho;
+    public KeepAliveExecutador(DatagramSocket socket) {
         this.datagramSocket = socket;
         this.mensagem = new Mensagem(null, null, "#KEEP-ALIVE");
     }
 
     public void run() {
 
-        try {
+        Integer portaLocal = datagramSocket.getLocalPort();
+        Integer portaVizinho = vizinhos.get(portaLocal);
 
-            // vai sempre mandar a mensagem com keep-alive como codigo, na tarefa de listener vai caputar essa mensagem sem printar nada, apenas para que a porta do vizinho nesta porta do nosso roteador
-            // ao seja desvinculada.
-            ByteArrayOutputStream bStream = new ByteArrayOutputStream();
-            ObjectOutput oo = new ObjectOutputStream(bStream);
-            oo.writeObject(this.mensagem);
-            oo.close();
+        if (portaVizinho != null) {
 
-            byte[] serializedMessage = bStream.toByteArray();
+            try {
+                // vai sempre mandar a mensagem com keep-alive como codigo, na tarefa de listener vai caputar essa mensagem sem printar nada, apenas para que a porta do vizinho nesta porta do nosso roteador
+                // ao seja desvinculada.
+                ByteArrayOutputStream bStream = new ByteArrayOutputStream();
+                ObjectOutput oo = new ObjectOutputStream(bStream);
+                oo.writeObject(this.mensagem);
+                oo.close();
 
-            DatagramPacket newPacket = new DatagramPacket(serializedMessage, 0, serializedMessage.length, inetAddress, portaVizinho);
+                byte[] serializedMessage = bStream.toByteArray();
 
-            datagramSocket.send(newPacket);
+                DatagramPacket newPacket = new DatagramPacket(serializedMessage, 0, serializedMessage.length, inetAddress, portaVizinho);
 
-        } catch (IOException e) {
+                datagramSocket.send(newPacket);
+
+            } catch (IOException e) {
+                //System.out.println("Erro ao enviar o keep alive para a porta do vizinho");
+            }
+        } else {
+//            System.out.println("Nenhum vizinho vinculado a esta porta");
         }
     }
 }

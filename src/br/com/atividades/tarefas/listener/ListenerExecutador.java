@@ -1,7 +1,7 @@
 package br.com.atividades.tarefas.listener;
 
-import br.com.atividades.dto.Mensagem;
 import br.com.atividades.Roteador;
+import br.com.atividades.dto.Mensagem;
 import br.com.atividades.dto.Roteamento;
 import br.com.atividades.image.Image;
 
@@ -14,13 +14,18 @@ import java.util.List;
 import java.util.TimerTask;
 
 import static br.com.atividades.Roteador.inetAddress;
+import static br.com.atividades.Roteador.vizinhos;
 
 class ListenerExecutador extends TimerTask {
 
     private DatagramSocket datagramSocket;
+    private Integer portaVizinho;
+    private Integer porta;
 
-    public ListenerExecutador(DatagramSocket socket) {
+    public ListenerExecutador(Integer portaVizinho, DatagramSocket socket) {
         this.datagramSocket = socket;
+        this.portaVizinho = portaVizinho;
+        this.porta = socket.getLocalPort();
     }
 
     private static String transformarPorta(Integer porta) {
@@ -50,11 +55,18 @@ class ListenerExecutador extends TimerTask {
             if (Mensagem.class.isInstance(object)) { // mensagem comum
                 mensagem = (Mensagem) object;
 
-                System.out.format("A mensagem '%s' foi enviada da porta %d %s %s\n",
-                        mensagem.getTexto(),
-                        mensagem.getPortaOrigem(),
-                        transformarPorta(mensagem.getPortaDestino()),
-                        mensagem.getBase64Image() == null ? "" : "(mensagem com imagem anexada");
+                if (mensagem.getTexto().contains("#KEEP-ALIVE")) {
+//                    System.out.println("#KEEP-ALIVE RECEBIDO " + getDatagramSocket().getLocalPort() + " DO " + vizinhos.get(getDatagramSocket().getLocalPort())); // comentar este print quando testado
+                    return; // sai do metodo para nao continuar a execulçao de demais logica abaixo
+
+                } else {
+
+                    System.out.format("A mensagem '%s' foi enviada da porta %d %s %s\n",
+                            mensagem.getTexto(),
+                            mensagem.getPortaOrigem(),
+                            mensagem.getPortaDestino(),
+                            mensagem.getBase64Image() == null ? "" : "(mensagem com imagem anexada");
+                }
             }
 
             /** Esse tipo de objeto sera apenas enviado através de uma thread agendadora ou evento de exit de um roteador*/
@@ -62,17 +74,12 @@ class ListenerExecutador extends TimerTask {
                 if (((List) object).size() > 0 && (((List) object).get(0) instanceof Roteamento)) {
                     tabela = (List<Roteamento>) object;
 
-                    System.out.println(tabela);
-                    // TODO lógica de atualização da tabela de roteamento
+                    Roteador.atualizarTabela(tabela, portaVizinho, porta);
+                    return;
                 }
             }
 
             iStream.close();
-
-            if(mensagem != null && mensagem.getTexto().contains("#KEEP-ALIVE")) {
-                System.out.println("Mensagem do keep-alive recebida com sucesso"); // comentar este print quando testado
-                return; // sai do metodo para nao continuar a execulçao de demais logica abaixo
-            }
 
             /** verifica se é ou não o roteador final*/
             boolean roteadorFinal = verificarRoteadorFinal(mensagem.getPortaDestino(), getDatagramSocket().getLocalPort());
@@ -85,7 +92,7 @@ class ListenerExecutador extends TimerTask {
                 }
                 System.out.println("Mensagem enviada para o roteador destino com sucesso!");
 
-            /** caso não for repassa a mensagem para o proximo roteador */
+                /** caso não for repassa a mensagem para o proximo roteador */
             } else {
                 System.out.println("Mensagem roteada para a proxima rota");
 
@@ -96,9 +103,21 @@ class ListenerExecutador extends TimerTask {
             }
 
         } catch (IOException ioException) {
-            //TODO default message error
+
+            Integer portaLocal = getDatagramSocket().getLocalPort();
+            Integer portaVizinha = vizinhos.get(portaLocal);
+
+            if (portaVizinha != null) { // se tem um vizinho vinculado, deve retira-lo da tabela de roteamento
+                Roteador.removeReferenciasDaTabelaDeRoteamento(portaVizinha);
+                vizinhos.put(portaLocal, null);
+                System.out.format("Porta vizinha %d foi desvinculada da tabela de roteamento\n", portaVizinha);
+
+            } else { // não faz nada;
+//                System.out.println("não faz nada");
+            }
+
         } catch (ClassNotFoundException e) {
-            //TODO default message error
+            System.out.println("Erro na deserialização do objeto enviado pela rede!");
         }
     }
 

@@ -5,6 +5,7 @@ import java.io.Serializable;
 public class Roteamento implements Serializable {
 
     private Integer portaDestino;
+
     private Integer metrica;
     private Integer portaSaida;
     private Integer portaLocalSaida;
@@ -28,8 +29,20 @@ public class Roteamento implements Serializable {
         return portaSaida;
     }
 
+    public void setPortaSaida(Integer portaSaida) { // quem ensinou
+        this.portaSaida = portaSaida;
+    }
+
     public Integer getPortaLocalSaida() {
         return portaLocalSaida;
+    }
+
+    public void setPortaLocalSaida(Integer portaLocalSaida) { // da onde vai sair a mensagem
+        this.portaLocalSaida = portaLocalSaida;
+    }
+
+    public void incrementaMetrica() {
+        this.metrica = this.metrica + 1;
     }
 
     @Override

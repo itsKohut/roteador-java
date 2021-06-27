@@ -7,9 +7,9 @@ public class KeepAliveTarefa {
 
     private Timer timer;
 
-    public KeepAliveTarefa(int vizinho, int seconds, DatagramSocket socket) {
+    public KeepAliveTarefa(int seconds, DatagramSocket socket) {
         timer = new Timer();
-        timer.schedule(new KeepAliveExecutador(vizinho, socket), 0, seconds * 1000);
+        timer.schedule(new KeepAliveExecutador(socket), 0, seconds * 1000);
     }
 
     public Timer getTimer() {

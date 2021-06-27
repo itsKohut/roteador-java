@@ -7,14 +7,26 @@ import java.util.stream.Stream;
 
 public class Impressora {
 
+    /**
+     * 1 - Enviar mensagem ";
+     * 2 - Imprimir as portas e seu respectivo vizinho";
+     * 3 - Imprimir tabela de roteamento";
+     * 4 - Desligar uma porta";
+     * 5 - Desligar roteador";
+     * 6 - Ligar porta";
+     * 7 - Ligar roteador"
+     * */
+
 
     public static void menu() {
         System.out.println("********************** MENU *******************");
         System.out.println("1 - Enviar mensagem ");
         System.out.println("2 - Imprimir as portas e seu respectivo vizinho");
         System.out.println("3 - Imprimir tabela de roteamento");
-        System.out.println("4 - Remover uma porta do roteador ");
+        System.out.println("4 - Desligar porta ");
         System.out.println("5 - Desligar roteador");
+        System.out.println("6 - Ligar porta ");
+        System.out.println("7 - Ligar roteador");
         System.out.println("***********************************************");
         System.out.println("Escolha uma das opções acima: ");
     }
